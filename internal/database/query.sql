@@ -15,16 +15,15 @@ INSERT INTO appliances ("name", wattage, user_id, group_id)
   VALUES ($1, $2, $3, $4)
   RETURNING id; 
 
--- name: UpdateApplianceAndReturnId :one
-UPDATE appliances ("name", wattage, user_id, group_id)
+-- name: UpdateAppliance :exec
+UPDATE appliances 
   SET "name" = $1, wattage = $2
-  RETURNING id; 
+  WHERE id = $3;
 
--- name: UpdateApplianceGroup :one
+-- name: UpdateApplianceGroup :exec
 UPDATE appliances 
   SET group_id = $1
-  WHERE id = $2
-  RETURNING id; 
+  WHERE id = $2;
 
 -- name: UpdateApplianceGroupID :exec
 UPDATE appliances 
@@ -32,6 +31,11 @@ UPDATE appliances
   WHERE id = $2;
 
 -- name: CreateUserAndReturnId :one
-INSERT INTO users ("username")
-  VALUES ($1)
+INSERT INTO users ("email", "nickname")
+  VALUES ($1, $2)
   RETURNING id; 
+
+-- name: CheckUserExists :one
+SELECT id FROM users
+  WHERE email = $1
+  LIMIT 1;

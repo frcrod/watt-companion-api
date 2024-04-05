@@ -28,7 +28,8 @@ type Group struct {
 
 type User struct {
 	ID        pgtype.UUID
-	Username  string
+	Email     string
+	Nickname  string
 	CreatedAt pgtype.Timestamptz
 	UpdatedAt pgtype.Timestamptz
 }

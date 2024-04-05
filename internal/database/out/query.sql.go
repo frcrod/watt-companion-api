@@ -11,14 +11,32 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const checkUserExists = `-- name: CheckUserExists :one
+SELECT id FROM users
+  WHERE email = $1
+  LIMIT 1
+`
+
+func (q *Queries) CheckUserExists(ctx context.Context, email string) (pgtype.UUID, error) {
+	row := q.db.QueryRow(ctx, checkUserExists, email)
+	var id pgtype.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
 const createUserAndReturnId = `-- name: CreateUserAndReturnId :one
-INSERT INTO users ("username")
-  VALUES ($1)
+INSERT INTO users ("email", "nickname")
+  VALUES ($1, $2)
   RETURNING id
 `
 
-func (q *Queries) CreateUserAndReturnId(ctx context.Context, username string) (pgtype.UUID, error) {
-	row := q.db.QueryRow(ctx, createUserAndReturnId, username)
+type CreateUserAndReturnIdParams struct {
+	Email    string
+	Nickname string
+}
+
+func (q *Queries) CreateUserAndReturnId(ctx context.Context, arg CreateUserAndReturnIdParams) (pgtype.UUID, error) {
+	row := q.db.QueryRow(ctx, createUserAndReturnId, arg.Email, arg.Nickname)
 	var id pgtype.UUID
 	err := row.Scan(&id)
 	return id, err
@@ -131,6 +149,39 @@ func (q *Queries) InsertApplianceAndReturnId(ctx context.Context, arg InsertAppl
 	var id pgtype.UUID
 	err := row.Scan(&id)
 	return id, err
+}
+
+const updateAppliance = `-- name: UpdateAppliance :exec
+UPDATE appliances 
+  SET "name" = $1, wattage = $2
+  WHERE id = $3
+`
+
+type UpdateApplianceParams struct {
+	Name    string
+	Wattage pgtype.Numeric
+	ID      pgtype.UUID
+}
+
+func (q *Queries) UpdateAppliance(ctx context.Context, arg UpdateApplianceParams) error {
+	_, err := q.db.Exec(ctx, updateAppliance, arg.Name, arg.Wattage, arg.ID)
+	return err
+}
+
+const updateApplianceGroup = `-- name: UpdateApplianceGroup :exec
+UPDATE appliances 
+  SET group_id = $1
+  WHERE id = $2
+`
+
+type UpdateApplianceGroupParams struct {
+	GroupID pgtype.UUID
+	ID      pgtype.UUID
+}
+
+func (q *Queries) UpdateApplianceGroup(ctx context.Context, arg UpdateApplianceGroupParams) error {
+	_, err := q.db.Exec(ctx, updateApplianceGroup, arg.GroupID, arg.ID)
+	return err
 }
 
 const updateApplianceGroupID = `-- name: UpdateApplianceGroupID :exec

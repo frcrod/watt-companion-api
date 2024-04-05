@@ -21,7 +21,7 @@ func run() error {
 	}
 	ctx := context.Background()
 
-	pgxConfig, err := pgxpool.ParseConfig("user=postgres dbname=local")
+	pgxConfig, err := pgxpool.ParseConfig("user=postgres dbname=postgres password=password")
 	if err != nil {
 		slog.Error("Error can't connect to db")
 		return nil
