@@ -6,11 +6,30 @@ import (
 	"net/http"
 
 	"github.com/frcrod/watt-companion-api/internal/database/out"
+	"github.com/frcrod/watt-companion-api/internal/types"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/labstack/echo/v4"
 	"github.com/markbates/goth"
 	"github.com/markbates/goth/gothic"
 )
+
+func addUserToSession(wr http.ResponseWriter, req *http.Request, user types.AuthUser) {
+	session, err := gothic.Store.Get(req, "auth")
+	if err != nil {
+		log.Print("Error ", err)
+	}
+
+	// Remove the raw data to reduce the size
+	user.User.RawData = map[string]interface{}{}
+
+	session.Values["user"] = user
+
+	err = session.Save(req, wr)
+	if err != nil {
+		log.Print("Problem Saving session data", err)
+	}
+}
 
 func DoAuth(e echo.Context, queries *out.Queries) error {
 	provider := e.Param("provider")
@@ -45,11 +64,12 @@ func Logout(e echo.Context) error {
 		return err
 	}
 
+	session.Values["user"] = goth.User{}
+	session.Options.MaxAge = -1
+	session.Save(e.Request(), e.Response().Writer)
+
 	e.Response().Header().Set("Location", "/")
 	e.Response().WriteHeader(http.StatusTemporaryRedirect)
-
-	session.Values["user"] = goth.User{}
-	session.Save(e.Request(), e.Response().Writer)
 
 	return nil
 }
@@ -60,15 +80,15 @@ func AuthCallback(e echo.Context, queries *out.Queries) error {
 	r := e.Request().WithContext(context.WithValue(context.Background(), "provider", provider))
 	user, err := gothic.CompleteUserAuth(e.Response().Writer, r)
 	if err != nil {
-		log.Fatal("Error logging in")
+		log.Fatal("Error logging in", err)
 		return err
 	}
 
-	_, err = queries.CheckUserExists(e.Request().Context(), user.Email)
+	id, err := queries.CheckUserExists(e.Request().Context(), user.Email)
 
 	if err != nil {
 		if err.Error() == pgx.ErrNoRows.Error() {
-			_, err = queries.CreateUserAndReturnId(r.Context(), out.CreateUserAndReturnIdParams{
+			id, err = queries.CreateUserAndReturnId(r.Context(), out.CreateUserAndReturnIdParams{
 				Email:    user.Email,
 				Nickname: user.FirstName,
 			})
@@ -80,25 +100,18 @@ func AuthCallback(e echo.Context, queries *out.Queries) error {
 		}
 	}
 
-	addUserToSession(e.Response().Writer, e.Request(), user)
+	uu, err := uuid.FromBytes(id.Bytes[:])
+	if err != nil {
+		log.Fatal("Error parsing uuid", err)
+	}
+
+	addUserToSession(e.Response().Writer, e.Request(), types.AuthUser{
+		Id:              uu,
+		User:            user,
+		IsAuthenticated: true,
+	})
 	e.Response().Header().Set("Location", "/")
 	e.Response().WriteHeader(http.StatusTemporaryRedirect)
 
 	return nil
-}
-
-func addUserToSession(wr http.ResponseWriter, req *http.Request, user goth.User) {
-	session, err := gothic.Store.Get(req, "auth")
-	if err != nil {
-		log.Print("Error ", err)
-	}
-
-	// Remove the raw data to reduce the size
-	user.RawData = map[string]interface{}{}
-
-	session.Values["user"] = user
-	err = session.Save(req, wr)
-	if err != nil {
-		log.Print("Problem Saving session data", err)
-	}
 }

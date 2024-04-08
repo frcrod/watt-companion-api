@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/gob"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/frcrod/watt-companion-api/api/handler"
 	"github.com/frcrod/watt-companion-api/internal/database/out"
+	"github.com/frcrod/watt-companion-api/internal/types"
 	"github.com/gorilla/sessions"
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -31,6 +33,7 @@ func CreateEchoInstance(queries *out.Queries) *echo.Echo {
 	maxAge := 86400 * 1                      // 1 day
 	isProd := os.Getenv("IS_PROD") == "true" // Set to true when serving over https
 
+	gob.Register(types.AuthUser{})
 	store := sessions.NewCookieStore([]byte(key))
 	store.MaxAge(maxAge)
 	store.Options.Path = "/"
